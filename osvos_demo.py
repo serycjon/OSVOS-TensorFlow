@@ -22,11 +22,18 @@ from dataloader import OsvosDataloader
 from dataset import Dataset
 os.chdir(root_folder)
 import datetime
+import argparse
+
+parser = argparse.ArgumentParser(description='OSVOS TF implementation.')
+parser.add_argument('--seq', type=str, help='DAVIS sequence', default='car-shadow')
+parser.add_argument('--train', help='do the finetuning first', action='store_true')
+
+args = parser.parse_args()
 
 # User defined parameters
-seq_name = "car-shadow"
+seq_name = args.seq  # "car-shadow"
 gpu_id = 0
-train_model = False
+train_model = args.train  # False
 result_path = os.path.join('Results', seq_name)
 
 # Train parameters
