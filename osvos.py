@@ -18,6 +18,13 @@ from PIL import Image
 
 slim = tf.contrib.slim
 
+from collections import namedtuple
+osvos_parameters = namedtuple('parameters',
+                              'batch_size, '
+                              'num_threads, '
+                              'height, '
+                              'width')
+
 
 def osvos_arg_scope(weight_decay=0.0002):
     """Defines the OSVOS arg scope.
@@ -395,7 +402,7 @@ def parameter_lr():
     return vars_corresp
 
 
-def _train(dataset, initial_ckpt, supervison, learning_rate, logs_path, max_training_iters, save_step, display_step,
+def _train(loader, initial_ckpt, supervison, learning_rate, logs_path, max_training_iters, save_step, display_step,
            global_step, iter_mean_grad=1, batch_size=1, momentum=0.9, resume_training=False, config=None, finetune=1,
            test_image_path=None, ckpt_name="osvos"):
     """Train OSVOS
@@ -428,8 +435,11 @@ def _train(dataset, initial_ckpt, supervison, learning_rate, logs_path, max_trai
     tf.logging.set_verbosity(tf.logging.INFO)
 
     # Prepare the input data
-    input_image = tf.placeholder(tf.float32, [batch_size, None, None, 3])
-    input_label = tf.placeholder(tf.float32, [batch_size, None, None, 1])
+    # input_image = tf.placeholder(tf.float32, [batch_size, None, None, 3])
+    # input_label = tf.placeholder(tf.float32, [batch_size, None, None, 1])
+
+    input_image = loader.image_batch
+    input_label = loader.segmentation_batch
 
     # Create the network
     with slim.arg_scope(osvos_arg_scope()):
@@ -506,7 +516,10 @@ def _train(dataset, initial_ckpt, supervison, learning_rate, logs_path, max_trai
     # summary_writer.add_run_metadata(run_metadata, 'step%d' % i)
     with tf.Session(config=config) as sess:
         print('Init variable')
+        sess.run(tf.local_variables_initializer())
         sess.run(init)
+        coordinator = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coordinator)
 
         # op to write logs to Tensorboard
         summary_writer = tf.summary.FileWriter(logs_path, graph=tf.get_default_graph())
@@ -543,13 +556,14 @@ def _train(dataset, initial_ckpt, supervison, learning_rate, logs_path, max_trai
         while step < max_training_iters + 1:
             # Average the gradient
             for _ in range(0, iter_mean_grad):
-                batch_image, batch_label = dataset.next_batch(batch_size, 'train')
-                image = preprocess_img(batch_image[0])
-                label = preprocess_labels(batch_label[0])
-                run_res = sess.run([total_loss, merged_summary_op] + grad_accumulator_ops,
-                                   feed_dict={input_image: image, input_label: label})
+                # batch_image, batch_label = dataset.next_batch(batch_size, 'train')
+                # image = preprocess_img(batch_image[0])
+                # label = preprocess_labels(batch_label[0])
+                # print('before run sess')
+                run_res = sess.run([total_loss, merged_summary_op] + grad_accumulator_ops)
                 batch_loss = run_res[0]
                 summary = run_res[1]
+                # print('it')
 
             # Apply the gradients
             sess.run(apply_gradient_op)  # Momentum updates here its statistics
@@ -576,6 +590,9 @@ def _train(dataset, initial_ckpt, supervison, learning_rate, logs_path, max_trai
             print("Model saved in file: %s" % save_path)
 
         print('Finished training.')
+
+        coordinator.request_stop()
+        coordinator.join(threads)
 
 
 def train_parent(dataset, initial_ckpt, supervison, learning_rate, logs_path, max_training_iters, save_step,
