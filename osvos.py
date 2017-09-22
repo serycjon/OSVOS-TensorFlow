@@ -663,15 +663,41 @@ def test(dataloader, checkpoint_file, result_path, config=None):
 
         if not os.path.exists(result_path):
             os.makedirs(result_path)
+
+        seg_soft_dir = os.path.join(result_path, 'seg_soft')
+        if not os.path.exists(seg_soft_dir):
+            os.makedirs(seg_soft_dir)
+        seg_dir = os.path.join(result_path, 'seg')
+        if not os.path.exists(seg_dir):
+            os.makedirs(seg_dir)
+        vid_dir = os.path.join(result_path, 'vid')
+        if not os.path.exists(vid_dir):
+            os.makedirs(vid_dir)
+
         try:
             while not coordinator.should_stop():
                 path, res = sess.run([dataloader.image_path, probabilities])
-                curr_frame = os.path.splitext(os.path.basename(path.decode('ascii')))[0]
+                input_path = path.decode('ascii')
+                curr_frame = os.path.splitext(os.path.basename(input_path))[0]
 
-                res_np = res.astype(np.float32)[0, :, :, 0] > 162.0/255.0
-                out_path = os.path.join(result_path, '{}.png'.format(curr_frame))
-                scipy.misc.imsave(out_path, res_np.astype(np.float32))
-                print('Saving ' + out_path)
+                res_np = res.astype(np.float32)[0, :, :, 0]
+
+                seg_path = os.path.join(seg_dir, '{}.png'.format(curr_frame))
+                scipy.misc.imsave(seg_path, (res_np > 0.757).astype(np.float32))
+
+                seg_soft_path = os.path.join(seg_soft_dir, '{}.png'.format(curr_frame))
+                scipy.misc.imsave(seg_soft_path, res_np)
+
+                frame = scipy.misc.imread(input_path)
+                resized = scipy.misc.imresize(res_np > 0.757, (frame.shape[0], frame.shape[1]))
+                tmp = frame[:, :, 1].astype(np.float32) + 100*(resized)
+                tmp[tmp > 255] = 255
+                frame[:, :, 1] = tmp.astype(np.uint8)
+
+                vid_path = os.path.join(vid_dir, '{}.jpg'.format(curr_frame))
+                scipy.misc.imsave(vid_path, frame)
+
+                print('Saving ' + curr_frame)
         except tf.errors.OutOfRangeError:
             print('Done testing -- epoch limit reached')
         finally:
