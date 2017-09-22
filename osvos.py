@@ -402,7 +402,7 @@ def parameter_lr():
     return vars_corresp
 
 
-def _train(loader, initial_ckpt, supervison, learning_rate, logs_path, max_training_iters, save_step, display_step,
+def _train(loader, initial_ckpt, supervison, learning_rate, model_path, logs_path, max_training_iters, save_step, display_step,
            global_step, iter_mean_grad=1, batch_size=1, momentum=0.9, resume_training=False, config=None, finetune=1,
            test_image_path=None, ckpt_name="osvos"):
     """Train OSVOS
@@ -425,7 +425,7 @@ def _train(loader, initial_ckpt, supervison, learning_rate, logs_path, max_train
     test_image_path: If image path provided, every save_step the result of the network with this image is stored
     Returns:
     """
-    model_name = os.path.join(logs_path, ckpt_name+".ckpt")
+    model_name = os.path.join(model_path, ckpt_name+".ckpt")
     if config is None:
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
@@ -527,7 +527,7 @@ def _train(loader, initial_ckpt, supervison, learning_rate, logs_path, max_train
         # Create saver to manage checkpoints
         saver = tf.train.Saver(max_to_keep=None)
 
-        last_ckpt_path = tf.train.latest_checkpoint(logs_path)
+        last_ckpt_path = tf.train.latest_checkpoint(model_path)
         if last_ckpt_path is not None and resume_training:
             # Load last checkpoint
             print('Initializing from previous checkpoint...')
@@ -595,7 +595,7 @@ def _train(loader, initial_ckpt, supervison, learning_rate, logs_path, max_train
         coordinator.join(threads)
 
 
-def train_parent(dataset, initial_ckpt, supervison, learning_rate, logs_path, max_training_iters, save_step,
+def train_parent(dataset, initial_ckpt, supervison, learning_rate, model_path, logs_path, max_training_iters, save_step,
                  display_step, global_step, iter_mean_grad=1, batch_size=1, momentum=0.9, resume_training=False,
                  config=None, test_image_path=None, ckpt_name="osvos"):
     """Train OSVOS parent network
@@ -604,12 +604,12 @@ def train_parent(dataset, initial_ckpt, supervison, learning_rate, logs_path, ma
     Returns:
     """
     finetune = 0
-    _train(dataset, initial_ckpt, supervison, learning_rate, logs_path, max_training_iters, save_step, display_step,
+    _train(dataset, initial_ckpt, supervison, learning_rate, model_path, logs_path, max_training_iters, save_step, display_step,
            global_step, iter_mean_grad, batch_size, momentum, resume_training, config, finetune, test_image_path,
            ckpt_name)
 
 
-def train_finetune(dataset, initial_ckpt, supervison, learning_rate, logs_path, max_training_iters, save_step,
+def train_finetune(dataset, initial_ckpt, supervison, learning_rate, model_path, logs_path, max_training_iters, save_step,
                    display_step, global_step, iter_mean_grad=1, batch_size=1, momentum=0.9, resume_training=False,
                    config=None, test_image_path=None, ckpt_name="osvos"):
     """Finetune OSVOS
@@ -618,7 +618,7 @@ def train_finetune(dataset, initial_ckpt, supervison, learning_rate, logs_path, 
     Returns:
     """
     finetune = 1
-    _train(dataset, initial_ckpt, supervison, learning_rate, logs_path, max_training_iters, save_step, display_step,
+    _train(dataset, initial_ckpt, supervison, learning_rate, model_path, logs_path, max_training_iters, save_step, display_step,
            global_step, iter_mean_grad, batch_size, momentum, resume_training, config, finetune, test_image_path,
            ckpt_name)
 

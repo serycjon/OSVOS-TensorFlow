@@ -33,6 +33,7 @@ result_path = os.path.join('Results', seq_name)
 parent_path = os.path.join('models', 'OSVOS_parent', 'OSVOS_parent.ckpt-50000')
 stamp = datetime.datetime.now().isoformat()
 logs_path = os.path.join('models', seq_name, stamp)
+model_path = os.path.join('models', seq_name)
 max_training_iters = 500
 
 from osvos import osvos_parameters
@@ -66,7 +67,7 @@ with tf.Graph().as_default():
         # with tf.Graph().as_default():
         with tf.device('/gpu:' + str(gpu_id)):
             global_step = tf.Variable(0, name='global_step', trainable=False)
-            osvos.train_finetune(loader, parent_path, side_supervision, learning_rate, logs_path, max_training_iters,
+            osvos.train_finetune(loader, parent_path, side_supervision, learning_rate, model_path, logs_path, max_training_iters,
                                 save_step, display_step, global_step, iter_mean_grad=1, ckpt_name=seq_name)
 
 with tf.Graph().as_default():
@@ -79,7 +80,8 @@ with tf.Graph().as_default():
 
     # Test the network
     with tf.device('/gpu:' + str(gpu_id)):
-        checkpoint_path = os.path.join('models', seq_name, seq_name+'.ckpt-'+str(max_training_iters))
+        checkpoint_path = os.path.join(model_path, seq_name+'.ckpt-'+str(max_training_iters))
+        # checkpoint_path = os.path.join('models', seq_name, seq_name+'.ckpt-'+str(max_training_iters))
         osvos.test(loader, checkpoint_path, result_path)
 
 # # Show results
