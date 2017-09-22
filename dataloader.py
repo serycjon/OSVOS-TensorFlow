@@ -1,6 +1,7 @@
 """Dataset loader as inspired by monodepth (https://github.com/mrharicot/monodepth)"""
 
 import tensorflow as tf
+import scipy
 
 def string_length_tf(t):
     return tf.py_func(len, [t], [tf.int64])
@@ -21,6 +22,8 @@ or a list of such strings."""
         self.image_batch = None
         self.segmentation_batch = None
 
+        self.h, self.w = params.height, params.width
+
         if mode == 'test':
             limit_epochs = 1
         else:
@@ -32,20 +35,33 @@ or a list of such strings."""
             _, line = line_reader.read(input_queue)
 
             split_line = tf.string_split([line]).values
+
+            with open(filenames_file, 'r') as fin:
+                py_line = fin.readline()
+                
         else:
             input_queue = tf.train.string_input_producer(filenames_file, shuffle=False, num_epochs=limit_epochs) 
             line = input_queue.dequeue()
             split_line = tf.string_split([line]).values
 
+            py_line = filenames_file[0]
+
+        # get the first image size
+        if (self.h is None) or (self.w is None):
+            py_split = py_line.split()
+            py_img = scipy.misc.imread(self.data_path + py_split[0])
+            self.h, self.w, _ = py_img.shape
+            print('going to resize everything to {}x{}'.format(self.h, self.w))
+
         if mode == 'test':
             image_path = tf.string_join([self.data_path, split_line[0]])
-            image_o = self.read_image(image_path)
+            image_o = self.resize(self.read_image(image_path))
         else:
             image_path        = tf.string_join([self.data_path, split_line[0]])
             segmentation_path = tf.string_join([self.data_path, split_line[1]])
 
-            image_o = self.read_image(image_path)
-            segmentation_o = self.read_segmentation(segmentation_path)
+            image_o = self.resize(self.read_image(image_path))
+            segmentation_o = self.resize(self.read_segmentation(segmentation_path))
 
         if mode == 'train':
             # randomly flip images
@@ -84,19 +100,17 @@ or a list of such strings."""
     def augment_image_pair(self, image, segmentation):
         return image, segmentation
 
+    def resize(self, image):
+        image  = tf.image.resize_images(image,  [self.h, self.w], tf.image.ResizeMethod.AREA)
+        return image
+        
     def read_image(self, image_path):
         image  = tf.image.decode_jpeg(tf.read_file(image_path))
-
         image  = tf.image.convert_image_dtype(image,  tf.float32)
-        image  = tf.image.resize_images(image,  [self.params.height, self.params.width], tf.image.ResizeMethod.AREA)
-
         return image
 
     def read_segmentation(self, image_path):
         image  = tf.image.decode_png(tf.read_file(image_path), channels=1)
-
         image  = tf.image.convert_image_dtype(image,  tf.float32)
-        image  = tf.image.resize_images(image,  [self.params.height, self.params.width], tf.image.ResizeMethod.AREA)
-
         return image
 

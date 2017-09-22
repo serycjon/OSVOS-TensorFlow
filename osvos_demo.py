@@ -46,8 +46,8 @@ max_training_iters = 500
 from osvos import osvos_parameters
 params = osvos_parameters(batch_size = 1,
                           num_threads = 1,
-                          height = 400,
-                          width = 600)
+                          height = None,
+                          width  = None)
 
 with tf.Graph().as_default():
 
