@@ -623,7 +623,7 @@ def train_finetune(dataset, initial_ckpt, supervison, learning_rate, logs_path, 
            ckpt_name)
 
 
-def test(dataset, checkpoint_file, result_path, config=None):
+def test(dataloader, checkpoint_file, result_path, config=None):
     """Test one sequence
     Args:
     dataset: Reference to a Dataset object instance
@@ -641,7 +641,7 @@ def test(dataset, checkpoint_file, result_path, config=None):
 
     # Input data
     batch_size = 1
-    input_image = tf.placeholder(tf.float32, [batch_size, None, None, 3])
+    input_image = dataloader.image_batch
 
     # Create the cnn
     with slim.arg_scope(osvos_arg_scope()):
@@ -656,16 +656,35 @@ def test(dataset, checkpoint_file, result_path, config=None):
         sess.run(tf.global_variables_initializer())
         sess.run(interp_surgery(tf.global_variables()))
         saver.restore(sess, checkpoint_file)
+        sess.run(tf.local_variables_initializer())
+
+        coordinator = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coordinator)
+
         if not os.path.exists(result_path):
             os.makedirs(result_path)
-        for frame in range(0, dataset.get_test_size()):
-            img, curr_img = dataset.next_batch(batch_size, 'test')
-            curr_frame = curr_img[0].split('/')[-1].split('.')[0] + '.png'
-            image = preprocess_img(img[0])
-            res = sess.run(probabilities, feed_dict={input_image: image})
-            res_np = res.astype(np.float32)[0, :, :, 0] > 162.0/255.0
-            scipy.misc.imsave(os.path.join(result_path, curr_frame), res_np.astype(np.float32))
-            print('Saving ' + os.path.join(result_path, curr_frame))
+        try:
+            while not coordinator.should_stop():
+                path, res = sess.run([dataloader.image_path, probabilities])
+                curr_frame = os.path.splitext(os.path.basename(path.decode('ascii')))[0]
+
+                res_np = res.astype(np.float32)[0, :, :, 0] > 162.0/255.0
+                out_path = os.path.join(result_path, '{}.png'.format(curr_frame))
+                scipy.misc.imsave(out_path, res_np.astype(np.float32))
+                print('Saving ' + out_path)
+        except tf.errors.OutOfRangeError:
+            print('Done testing -- epoch limit reached')
+        finally:
+            # When done, ask the threads to stop.
+            coordinator.request_stop()
+        coordinator.join(threads)
+        # for frame in range(0, dataset.get_test_size()):
+        #     # curr_frame = curr_img[0].split('/')[-1].split('.')[0] + '.png'
+        #     path, res = sess.run([loader.image_path, probabilities])
+        #     print(path)
+        #     res_np = res.astype(np.float32)[0, :, :, 0] > 162.0/255.0
+        #     # scipy.misc.imsave(os.path.join(result_path, curr_frame), res_np.astype(np.float32))
+        #     print('Saving ' + path)
 
 
 

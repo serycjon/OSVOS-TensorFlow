@@ -9,6 +9,11 @@ class OsvosDataloader(object):
     """Osvos dataloader"""
 
     def __init__(self, data_path, filenames_file, params, mode):
+        """ data_path is the base_dir of the dataset.
+filenames_file can be either a filename containing pair of space-separated relative image+segmentation paths like:
+/JPEGImages/480p/car-shadow/00000.jpg /Annotations/480p/car-shadow/00000.png
+or a list of such strings."""
+
         self.data_path = data_path
         self.params = params
         self.mode = mode
@@ -16,11 +21,21 @@ class OsvosDataloader(object):
         self.image_batch = None
         self.segmentation_batch = None
 
-        input_queue = tf.train.string_input_producer([filenames_file], shuffle=False)
-        line_reader = tf.TextLineReader()
-        _, line = line_reader.read(input_queue)
+        if mode == 'test':
+            limit_epochs = 1
+        else:
+            limit_epochs = None
 
-        split_line = tf.string_split([line]).values
+        if isinstance(filenames_file, str):
+            input_queue = tf.train.string_input_producer([filenames_file], shuffle=False, num_epochs=limit_epochs)
+            line_reader = tf.TextLineReader()
+            _, line = line_reader.read(input_queue)
+
+            split_line = tf.string_split([line]).values
+        else:
+            input_queue = tf.train.string_input_producer(filenames_file, shuffle=False, num_epochs=limit_epochs) 
+            line = input_queue.dequeue()
+            split_line = tf.string_split([line]).values
 
         if mode == 'test':
             image_path = tf.string_join([self.data_path, split_line[0]])
@@ -59,8 +74,10 @@ class OsvosDataloader(object):
                                                                 allow_smaller_final_batch=False)
 
         elif mode == 'test':
-            self.image_batch = image_o
+            # self.image_batch = image_o
+            self.image_batch = tf.expand_dims(image_o, 0)
             self.image_batch.set_shape([1, None, None, 3])
+            self.image_path = image_path
 
         # self.image_batch_shape = tf.shape(self.image_batch)
 
